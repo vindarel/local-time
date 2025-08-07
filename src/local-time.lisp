@@ -695,6 +695,7 @@ In other words:
 
 (defun days-in-month (month year)
   "Returns the number of days in the given month of the specified year."
+  (assert (< 0 month 12) nil "MONTH is ~d, which is not within 1 to 12." month)
   (let ((normal-days (aref +rotated-month-days-without-leap-day+
                            (mod (+ month 9) 12))))
     (if (and (= month 2)
