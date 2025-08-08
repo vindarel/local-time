@@ -13,8 +13,8 @@
   (daylight-p nil))
 
 (defstruct timezone
-  (transitions (coerce #(0) '(simple-array fixnum (1))) :type (simple-array fixnum (*)))
-  (indexes (coerce #(0) '(simple-array fixnum (1))) :type (simple-array fixnum (*)))
+  (transitions (coerce #(0) '(simple-array (signed-byte 32) (1))) :type (simple-array (signed-byte 32) (*)))
+  (indexes (coerce #(0) '(simple-array (signed-byte 32) (1))) :type (simple-array (signed-byte 32) (*)))
   (subzones #() :type simple-vector)
   (leap-seconds nil :type list)
   (path nil)
@@ -74,7 +74,7 @@
                  format-rfc1123-timestring to-rfc1123-timestring)
          (ftype (function (&rest t) string) format-rfc3339-timestring)
          (ftype (function (&rest t) string) format-timestring)
-         (ftype (function (&rest t) fixnum) local-timezone)
+         (ftype (function (&rest t) (signed-byte 32)) local-timezone)
          (ftype (function (&rest t) (values
                                      timezone-offset
                                      boolean
@@ -200,14 +200,14 @@
 (defparameter +modified-julian-date-offset+ -51604)
 
 (defun transition-position (needle haystack)
-  (declare (type fixnum needle)
-           (type (simple-array fixnum (*)) haystack)
+  (declare (type integer needle)
+           (type (simple-array (signed-byte 32) (*)) haystack)
            (optimize (speed 3)))
   (loop
-     with start fixnum = 0
-     with end fixnum = (length haystack)
+     with start of-type (signed-byte 32) = 0
+     with end of-type (signed-byte 32) = (length haystack)
      ;; Invariant: haystack[start-1] <= needle < haystack[end]
-     for middle fixnum = (floor (+ end start) 2)
+     for middle of-type (signed-byte 32) = (floor (+ end start) 2)
      while (< start end)
      do (if (< needle (elt haystack middle))
             (setf end middle)
@@ -274,7 +274,7 @@ found."
              (values subzone
                      transition-idx))))))
 
-(declaim (ftype (function (t t &optional t) fixnum) %read-binary-integer))
+(declaim (ftype (function (t t &optional t) (or (signed-byte 32) (unsigned-byte 32))) %read-binary-integer))
 (defun %read-binary-integer (stream byte-count &optional (signed nil))
   "Read BYTE-COUNT bytes from the binary stream STREAM, and return an integer which is its representation in network byte order (MSB).  If SIGNED is true, interprets the most significant bit as a sign indicator."
   (declare (optimize (speed 3))
@@ -283,12 +283,12 @@ found."
     :with result = 0
     :for offset :from (* (1- byte-count) 8) :downto 0 :by 8
     :do (setf (ldb (byte 8 offset)
-                   (the fixnum result))
+                   (the (unsigned-byte 32) result))
               (the (integer 0 255) (read-byte stream)))
     :finally (if signed
                  (let ((high-bit (* byte-count 8)))
                    (if (logbitp (1- high-bit) result)
-                       (return (the fixnum (- result (ash 1 high-bit))))
+                       (return (the (signed-byte 32) (- result (ash 1 high-bit))))
                        (return result)))
                  (return result))))
 
@@ -328,14 +328,14 @@ found."
 
 (defun %tz-read-transitions (inf count)
   (make-array count
-              :element-type 'fixnum
+              :element-type '(signed-byte 32)
               :initial-contents
               (loop for idx from 1 upto count
                  collect (%read-binary-integer inf 4 t))))
 
 (defun %tz-read-indexes (inf count)
   (make-array count
-              :element-type 'fixnum
+              :element-type '(signed-byte 32)
               :initial-contents
               (loop for idx from 1 upto count
                     collect (%read-binary-integer inf 1))))
@@ -356,8 +356,8 @@ found."
     (loop for idx from 1 upto count
           collect (%read-binary-integer inf 4) into sec
           collect (%read-binary-integer inf 4) into adjustment
-          finally (return (cons (make-array count :element-type 'fixnum :initial-contents sec)
-                                (make-array count :element-type 'fixnum :initial-contents adjustment))))))
+          finally (return (cons (make-array count :element-type '(signed-byte 32) :initial-contents sec)
+                                (make-array count :element-type '(signed-byte 32) :initial-contents adjustment))))))
 
 (defun %tz-read-abbrevs (inf length)
   (let ((a (make-array length :element-type '(unsigned-byte 8))))
@@ -695,7 +695,7 @@ In other words:
 
 (defun days-in-month (month year)
   "Returns the number of days in the given month of the specified year."
-  (assert (< 0 month 12) nil "MONTH is ~d, which is not within 1 to 12." month)
+  (assert (<= 1 month 12) nil "MONTH is ~d, which is not within 1 to 12." month)
   (let ((normal-days (aref +rotated-month-days-without-leap-day+
                            (mod (+ month 9) 12))))
     (if (and (= month 2)
@@ -1077,7 +1077,7 @@ elements."
       ((timeval (* timeval))
        ;; and do this to allow a 0 for NULL
        (timezone :foreign-address))
-    :returning (:int fixnum)))
+    :returning (:int (signed-byte 32))))
 
 #+(and allegro os-windows)
 (eval-when (:compile-toplevel :load-toplevel :execute)
@@ -1546,7 +1546,7 @@ The currently supported values in local-time are:
   (the list
        (let (year month day hour minute second nsec offset-hour offset-minute)
          (declare (type (or null fixnum) start end year month day hour minute second offset-hour offset-minute)
-                  (type (or null (signed-byte 32)) nsec))
+                  (type (or null (integer 0 1000000000)) nsec))
          (macrolet ((passert (expression)
                       `(unless ,expression
                          (parse-error ',expression)))
@@ -1691,7 +1691,7 @@ The currently supported values in local-time are:
                                 (setf nsec (* (the (integer 0 999999999) (parse-integer time-string :start start :end end))
                                               (aref #.(coerce #(1000000000 100000000 10000000
                                                                 1000000 100000 10000 1000 100 10 1)
-                                                              '(simple-array (signed-byte 32) (10)))
+                                                              '(simple-array (integer 0 1000000000) (10)))
                                                     (- end start)))))
                               (setf nsec 0)))))
                     (time-offset (start-end sign)

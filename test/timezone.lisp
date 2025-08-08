@@ -51,7 +51,7 @@
     (dolist (case cases)
       (destructuring-bind (needle haystack want)
           case
-        (let ((got (local-time::transition-position needle (coerce haystack '(simple-array fixnum (*))))))
+        (let ((got (local-time::transition-position needle (coerce haystack '(simple-array (signed-byte 32) (*))))))
           (is (= got want)
               "(transition-position ~a ~a) got ~a, want ~a"
               needle haystack got want))))))
@@ -183,15 +183,16 @@ is expected instead.")
                june-utc))))
 
 (deftest test/timezone/strict-validity ()
-  ;; The timezone EET is only defined from 1977-04-03.
   (flet ((_eet-to-utc ()
            (multiple-value-list
             (local-time:decode-timestamp
-             (local-time:encode-timestamp 0 0 0 0 1 4 1977 :timezone eet)
+             (local-time:encode-timestamp 0 0 0 0 1 4 1900 :timezone eet)
              :offset 0))))
+    ;; The first EET timezone transition points to LMT (Local mean
+    ;; time), which is why the minutes are at an odd value.
     (and (let ((local-time::*strict-first-subzone-validity* nil))
            (is (equal (reverse (subseq (_eet-to-utc) 2 7))
-                      '(1977 3 31 21 0))))
+                      '(1900 3 31 22 25))))
          (let ((local-time::*strict-first-subzone-validity* t))
            (signals simple-error (_eet-to-utc))))))
 
