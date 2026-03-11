@@ -8,6 +8,12 @@
            #:day-of
            #:sec-of
            #:nsec-of
+           #:invalid-timestring
+           #:timestring-of
+           #:failure-of
+           #:invalid-time-specification
+           #:invalid-timezone-file
+           #:path-of
            #:timestamp<
            #:timestamp<=
            #:timestamp>
@@ -41,7 +47,6 @@
            #:timestamp-week
            #:timestamp-year
            #:parse-timestring
-           #:invalid-timestring
            #:format-timestring
            #:format-rfc1123-timestring
            #:to-rfc1123-timestring
